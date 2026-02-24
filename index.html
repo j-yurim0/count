@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>도면 수량 자동 산출기</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f4f7f6; }
+        .container { max-width: 600px; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #333; }
+        .upload-section { margin-bottom: 20px; padding: 20px; border: 2px dashed #ccc; text-align: center; border-radius: 8px; }
+        .result-section { margin-top: 20px; display: none; }
+        .material-box { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; background-color: #fafafa; }
+        .material-title { font-weight: bold; font-size: 1.2em; color: #0056b3; margin-bottom: 10px; }
+        select, button { padding: 8px; font-size: 16px; margin-top: 10px; }
+        button { background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
+        button:hover { background-color: #004494; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📄 도면 수량 자동 산출 및 배분</h2>
+    
+    <div class="upload-section">
+        <p>설계 견적서 (엑셀 파일)를 업로드하세요.</p>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" />
+    </div>
+
+    <div id="resultArea" class="result-section">
+        <div class="material-box">
+            <div class="material-title">🟦 각관</div>
+            <div>인식된 도면 수량: <span id="pipeCount" style="font-weight:bold; color:red;">0</span> 장</div>
+            <label>담당자 배정: </label>
+            <select id="pipeAssignee">
+                <option value="">선택하세요</option>
+                <option value="김철수">김철수</option>
+                <option value="이영희">이영희</option>
+            </select>
+        </div>
+
+        <div class="material-box">
+            <div class="material-title">🟩 C형강</div>
+            <div>인식된 도면 수량: <span id="cCount" style="font-weight:bold; color:red;">0</span> 장</div>
+            <label>담당자 배정: </label>
+            <select id="cAssignee">
+                <option value="">선택하세요</option>
+                <option value="박민수">박민수</option>
+                <option value="최지윤">최지윤</option>
+            </select>
+        </div>
+
+        <button onclick="saveData()">데이터 저장 (제출)</button>
+    </div>
+</div>
+
+<script>
+    document.getElementById('excelFile').addEventListener('change', handleFile, false);
+
+    function handleFile(e) {
+        let files = e.target.files;
+        if (files.length === 0) return;
+        let f = files[0];
+        let reader = new FileReader();
+
+        reader.onload = function(e) {
+            let data = new Uint8Array(e.target.result);
+            // 엑셀 파일 읽기
+            let workbook = XLSX.read(data, {type: 'array'});
+            // 첫 번째 시트 가져오기
+            let firstSheetName = workbook.SheetNames[0];
+            let worksheet = workbook.Sheets[firstSheetName];
+            // 엑셀 데이터를 자바스크립트 배열로 변환
+            let json_data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+            
+            analyzeData(json_data);
+        };
+        reader.readAsArrayBuffer(f);
+    }
+
+    function analyzeData(rows) {
+        let countC = 0;
+        let countPipe = 0;
+        let currentSection = "각관"; // 기본적으로 맨 위는 각관이라고 가정 (필요시 수정)
+
+        for (let i = 0; i < rows.length; i++) {
+            let row = rows[i];
+            if (!row || row.length === 0) continue; // 빈 줄 건너뛰기
+
+            // 행의 모든 데이터를 하나의 문자열로 합쳐서 키워드 검색
+            let rowText = row.join("").replace(/\s/g, ""); 
+
+            // 구역 제목 인식 ("2.C형강", "1.각관" 등)
+            if (rowText.includes("C형강")) {
+                currentSection = "C형강";
+                continue;
+            } else if (rowText.includes("각관")) {
+                currentSection = "각관";
+                continue;
+            }
+
+            // 쓸데없는 헤더나 소계 줄은 수량에서 제외
+            if (rowText.includes("제품명") || rowText.includes("규격") || rowText.includes("소계")) {
+                continue;
+            }
+
+            // 제품명(예: POST-1, PURLIN-1 등)이 있는 유효한 데이터 행인지 확인
+            // 보통 첫 번째나 두 번째 칸에 제품명이 들어감
+            let hasData = row[0] || row[1]; 
+            
+            if (hasData) {
+                if (currentSection === "C형강") {
+                    countC++;
+                } else if (currentSection === "각관") {
+                    countPipe++;
+                }
+            }
+        }
+
+        // 결과 화면에 표시
+        document.getElementById('cCount').innerText = countC;
+        document.getElementById('pipeCount').innerText = countPipe;
+        document.getElementById('resultArea').style.display = "block";
+    }
+
+    function saveData() {
+        let pipeCount = document.getElementById('pipeCount').innerText;
+        let pipeAssignee = document.getElementById('pipeAssignee').value;
+        let cCount = document.getElementById('cCount').innerText;
+        let cAssignee = document.getElementById('cAssignee').value;
+
+        if(!pipeAssignee || !cAssignee) {
+            alert("각관과 C형강의 담당자를 모두 선택해주세요!");
+            return;
+        }
+
+        // 나중에 이 부분에 Google Sheets나 Firebase로 데이터를 전송하는 코드를 넣으면 됩니다.
+        alert(`저장 대기 중!\n각관: ${pipeCount}장 (${pipeAssignee})\nC형강: ${cCount}장 (${cAssignee})`);
+    }
+</script>
+
+</body>
+</html>
