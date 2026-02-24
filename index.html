@@ -1,4 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>도면 수량 자동 산출 및 배분</title>
+    <!-- 엑셀 파일을 읽기 위한 외부 라이브러리 (SheetJS) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { 
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; 
+            padding: 20px; 
+            background-color: #f4f7f6; 
+            display: flex;
+            justify-content: center;
+        }
+        .container { 
+            width: 100%;
+            max-width: 600px; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        }
+        h2 { 
+            color: #333; 
+            text-align: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        .upload-section { 
+            margin-bottom: 20px; 
+            padding: 30px 20px; 
+            border: 2px dashed #0056b3; 
+            background-color: #f8fbff;
+            text-align: center; 
+            border-radius: 8px; 
+        }
+        .result-section { 
+            margin-top: 20px; 
+            display: none; /* 파일 업로드 전에는 숨김 */
+        }
+        .material-box { 
+            border: 1px solid #ddd; 
+            padding: 20px; 
+            margin-bottom: 15px; 
+            border-radius: 8px; 
+            background-color: #fafafa; 
+        }
+        .material-title { 
+            font-weight: bold; 
+            font-size: 1.2em; 
+            color: #333; 
+            margin-bottom: 15px; 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .count-text {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #e53e3e;
+            font-size: 1.3em;
+        }
+        .assign-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        select, button { 
+            padding: 10px; 
+            font-size: 15px; 
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        select {
+            flex: 1;
+        }
+        button.submit-btn { 
+            background-color: #0056b3; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            width: 100%; 
+            padding: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: background-color 0.2s;
+        }
+        button.submit-btn:hover { 
+            background-color: #004494; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📄 도면 수량 자동 산출기</h2>
+    
+    <div class="upload-section">
+        <p style="margin-top: 0; font-weight: bold; color: #555;">설계 견적서 (엑셀 파일)를 업로드하세요.</p>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" style="margin-top: 10px;" />
+    </div>
+
+    <div id="resultArea" class="result-section">
+        <!-- 각관 결과 -->
+        <div class="material-box">
+            <div class="material-title">🟦 각관 (POST, GIRDER 등)</div>
+            <div class="count-text">인식된 도면 수량: <span id="pipeCount" class="highlight">0</span> 장</div>
+            <div class="assign-row">
+                <label>담당자 배정:</label>
+                <select id="pipeAssignee">
+                    <option value="">선택하세요</option>
+                    <option value="김철수">김철수</option>
+                    <option value="이영희">이영희</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- C형강 결과 -->
+        <div class="material-box">
+            <div class="material-title">🟩 C형강 (PURLIN, BRACE 등)</div>
+            <div class="count-text">인식된 도면 수량: <span id="cCount" class="highlight">0</span> 장</div>
+            <div class="assign-row">
+                <label>담당자 배정:</label>
+                <select id="cAssignee">
+                    <option value="">선택하세요</option>
+                    <option value="박민수">박민수</option>
+                    <option value="최지윤">최지윤</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="submit-btn" onclick="saveData()">데이터 저장 (제출)</button>
+    </div>
+</div>
+
 <script>
+    // 파일 업로드 이벤트 리스너 연결
     document.getElementById('excelFile').addEventListener('change', handleFile, false);
 
     function handleFile(e) {
@@ -8,13 +152,19 @@
         let reader = new FileReader();
 
         reader.onload = function(e) {
-            let data = new Uint8Array(e.target.result);
-            let workbook = XLSX.read(data, {type: 'array'});
-            let firstSheetName = workbook.SheetNames[0];
-            let worksheet = workbook.Sheets[firstSheetName];
-            let json_data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-            
-            analyzeData(json_data);
+            try {
+                let data = new Uint8Array(e.target.result);
+                let workbook = XLSX.read(data, {type: 'array'});
+                let firstSheetName = workbook.SheetNames[0];
+                let worksheet = workbook.Sheets[firstSheetName];
+                // 엑셀 데이터를 자바스크립트 배열로 변환
+                let json_data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                
+                analyzeData(json_data);
+            } catch (error) {
+                alert("엑셀 파일을 읽는 중 오류가 발생했습니다. 파일 형식을 확인해주세요.");
+                console.error(error);
+            }
         };
         reader.readAsArrayBuffer(f);
     }
@@ -22,28 +172,23 @@
     function analyzeData(rows) {
         let countC = 0;
         let countPipe = 0;
-        let currentSection = "각관"; // 기본값 (맨 처음 제목이 없을 경우 각관으로 시작)
+        // 보통 견적서 최상단에 아무 구역 표시 없이 자재가 시작되면 '각관'일 확률이 높음
+        let currentSection = "각관"; 
 
         for (let i = 0; i < rows.length; i++) {
             let row = rows[i];
             if (!row || row.length === 0) continue;
 
-            // 핵심 수정 포인트: 해당 줄의 모든 칸 데이터를 빈칸 없이 하나로 합칩니다.
-            // (예: POST-1, HOLE, 100 -> POST-1HOLE100)
-            let rowText = row.map(cell => cell ? String(cell).replace(/\s/g, "") : "").join("");
+            // 해당 줄에서 빈 칸을 제외하고 '실제로 데이터가 들어있는 칸의 개수'를 파악
+            let filledCells = row.filter(cell => cell !== undefined && cell !== null && String(cell).trim() !== "");
+            let numFilled = filledCells.length;
 
-            if (rowText === "") continue; // 완전히 빈 줄은 통과
+            if (numFilled === 0) continue; // 데이터가 아예 없는 빈 줄은 무시
 
-            // 구역 변경 인식
-            if (rowText.includes("C형강")) {
-                currentSection = "C형강";
-                continue;
-            } else if (rowText.includes("각관")) {
-                currentSection = "각관";
-                continue;
-            }
+            // 줄 전체 데이터를 공백 없이 하나의 문장으로 합침
+            let rowText = filledCells.join("").replace(/\s/g, "");
 
-            // 수량에서 제외해야 할 '제목/소계' 줄 걸러내기
+            // 1. 계산에서 제외해야 하는 '제목 헤더'나 '소계' 줄 필터링
             if (rowText.includes("제품명") || 
                 rowText.includes("규격") || 
                 rowText.includes("소계") || 
@@ -53,8 +198,27 @@
                 continue;
             }
 
-            // 위의 조건들을 다 통과했고, 글자 길이가 10자 이상이면 '실제 자재 도면 데이터'로 취급하여 카운트!
-            if (rowText.length > 10) {
+            // 2. 구역 이름 인식 ("1. C형강", "2. 각관" 등)
+            // 특징: 자재 상세 스펙이 없으므로 데이터가 채워진 칸이 보통 1~2개뿐임
+            if (numFilled <= 2) {
+                if (rowText.includes("C형강")) {
+                    currentSection = "C형강";
+                } else if (rowText.includes("각관")) {
+                    currentSection = "각관";
+                }
+                continue; // 구역 제목 줄이므로 수량 카운트는 하지 않고 다음 줄로 넘어감
+            }
+
+            // 3. 실제 자재/도면 데이터 인식 (칸이 3개 이상 채워져 있음)
+            // 제품명 자체에 "C형강" 또는 "각관" 글자가 있으면 우선 처리
+            if (rowText.includes("C형강")) {
+                countC++;
+                currentSection = "C형강"; 
+            } else if (rowText.includes("각관")) {
+                countPipe++;
+                currentSection = "각관";
+            } else {
+                // 제품명이 "POST-1", "PURLIN-1" 같이 구역 이름이 안 적혀 있으면 현재 지정된 구역을 따름
                 if (currentSection === "C형강") {
                     countC++;
                 } else if (currentSection === "각관") {
@@ -63,10 +227,13 @@
             }
         }
 
-        // 결과 화면에 표시
+        // 4. 화면에 수량 업데이트 및 결과창 띄우기
         document.getElementById('cCount').innerText = countC;
         document.getElementById('pipeCount').innerText = countPipe;
         document.getElementById('resultArea').style.display = "block";
+        
+        // 업로드 파일 초기화 (같은 파일을 다시 올렸을 때도 작동하게 함)
+        document.getElementById('excelFile').value = ""; 
     }
 
     function saveData() {
@@ -75,11 +242,20 @@
         let cCount = document.getElementById('cCount').innerText;
         let cAssignee = document.getElementById('cAssignee').value;
 
+        // 제출 전 유효성 검사
         if(!pipeAssignee || !cAssignee) {
             alert("각관과 C형강의 담당자를 모두 선택해주세요!");
             return;
         }
+        if(pipeCount === "0" && cCount === "0") {
+            alert("인식된 도면 수량이 없습니다. 올바른 파일인지 확인해주세요.");
+            return;
+        }
 
-        alert(`저장 준비 완료!\n각관: ${pipeCount}장 (${pipeAssignee})\nC형강: ${cCount}장 (${cAssignee})`);
+        // 성공 메시지 (향후 구글 스프레드시트/파이어베이스 연동 시 이 부분을 교체)
+        alert(`🎉 저장 준비 완료!\n\n🟦 각관: ${pipeCount}장 (담당: ${pipeAssignee})\n🟩 C형강: ${cCount}장 (담당: ${cAssignee})`);
     }
 </script>
+
+</body>
+</html>
