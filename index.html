@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>도면 수량 자동 산출 및 배분</title>
+    <title>도면 수량 자동 산출 및 시트 연동</title>
     <!-- 엑셀 파일을 읽기 위한 외부 라이브러리 (SheetJS) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -39,7 +39,16 @@
         }
         .result-section { 
             margin-top: 20px; 
-            display: none; /* 파일 업로드 전에는 숨김 */
+            display: none; 
+        }
+        .project-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1em;
+            box-sizing: border-box;
         }
         .material-box { 
             border: 1px solid #ddd; 
@@ -47,41 +56,25 @@
             margin-bottom: 15px; 
             border-radius: 8px; 
             background-color: #fafafa; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .material-title { 
             font-weight: bold; 
             font-size: 1.2em; 
             color: #333; 
-            margin-bottom: 15px; 
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
         .count-text {
-            font-size: 1.1em;
-            margin-bottom: 15px;
+            font-size: 1.2em;
         }
         .highlight {
             font-weight: bold;
             color: #e53e3e;
-            font-size: 1.3em;
-        }
-        .assign-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        select, button { 
-            padding: 10px; 
-            font-size: 15px; 
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        }
-        select {
-            flex: 1;
+            font-size: 1.4em;
         }
         button.submit-btn { 
-            background-color: #0056b3; 
+            background-color: #107c41; 
             color: white; 
             border: none; 
             border-radius: 6px; 
@@ -94,55 +87,53 @@
             transition: background-color 0.2s;
         }
         button.submit-btn:hover { 
-            background-color: #004494; 
+            background-color: #0b5c30; 
+        }
+        button.submit-btn:disabled {
+            background-color: #888;
+            cursor: not-allowed;
+        }
+        .info-text {
+            font-size: 0.9em;
+            color: #666;
+            text-align: center;
+            margin-top: 15px;
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>📄 도면 수량 자동 산출기</h2>
+    <h2>📄 도면 수량 자동 추출기</h2>
     
     <div class="upload-section">
-        <p style="margin-top: 0; font-weight: bold; color: #555;">설계 견적서 (엑셀 파일)를 업로드하세요.</p>
+        <p style="margin-top: 0; font-weight: bold; color: #555;">영업/설계 견적서 (엑셀 파일)를 업로드하세요.</p>
         <input type="file" id="excelFile" accept=".xlsx, .xls" style="margin-top: 10px;" />
     </div>
 
     <div id="resultArea" class="result-section">
+        
+        <label for="projectName" style="font-weight: bold; display: block; margin-bottom: 8px;">견적서 / 프로젝트 명</label>
+        <input type="text" id="projectName" class="project-input" placeholder="예) 무주군 체육관 신축공사 견적건">
+
         <!-- 각관 결과 -->
         <div class="material-box">
-            <div class="material-title">🟦 각관 (POST, GIRDER 등)</div>
-            <div class="count-text">인식된 도면 수량: <span id="pipeCount" class="highlight">0</span> 장</div>
-            <div class="assign-row">
-                <label>담당자 배정:</label>
-                <select id="pipeAssignee">
-                    <option value="">선택하세요</option>
-                    <option value="김철수">김철수</option>
-                    <option value="이영희">이영희</option>
-                </select>
-            </div>
+            <div class="material-title">🟦 각관 도면</div>
+            <div class="count-text"><span id="pipeCount" class="highlight">0</span> 장</div>
         </div>
 
         <!-- C형강 결과 -->
         <div class="material-box">
-            <div class="material-title">🟩 C형강 (PURLIN, BRACE 등)</div>
-            <div class="count-text">인식된 도면 수량: <span id="cCount" class="highlight">0</span> 장</div>
-            <div class="assign-row">
-                <label>담당자 배정:</label>
-                <select id="cAssignee">
-                    <option value="">선택하세요</option>
-                    <option value="박민수">박민수</option>
-                    <option value="최지윤">최지윤</option>
-                </select>
-            </div>
+            <div class="material-title">🟩 C형강 도면</div>
+            <div class="count-text"><span id="cCount" class="highlight">0</span> 장</div>
         </div>
 
-        <button class="submit-btn" onclick="saveData()">데이터 저장 (제출)</button>
+        <button class="submit-btn" onclick="sendToGoogleSheet()">구글 시트로 수량 전송</button>
+        <p class="info-text">※ 담당자 지정은 구글 스프레드시트에서 진행합니다.</p>
     </div>
 </div>
 
 <script>
-    // 파일 업로드 이벤트 리스너 연결
     document.getElementById('excelFile').addEventListener('change', handleFile, false);
 
     function handleFile(e) {
@@ -157,12 +148,11 @@
                 let workbook = XLSX.read(data, {type: 'array'});
                 let firstSheetName = workbook.SheetNames[0];
                 let worksheet = workbook.Sheets[firstSheetName];
-                // 엑셀 데이터를 자바스크립트 배열로 변환
                 let json_data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
                 
                 analyzeData(json_data);
             } catch (error) {
-                alert("엑셀 파일을 읽는 중 오류가 발생했습니다. 파일 형식을 확인해주세요.");
+                alert("엑셀 파일을 읽는 중 오류가 발생했습니다. 인코딩이나 파일 형식을 확인해주세요.");
                 console.error(error);
             }
         };
@@ -172,88 +162,112 @@
     function analyzeData(rows) {
         let countC = 0;
         let countPipe = 0;
-        // 보통 견적서 최상단에 아무 구역 표시 없이 자재가 시작되면 '각관'일 확률이 높음
-        let currentSection = "각관"; 
+        let currentSection = ""; 
 
         for (let i = 0; i < rows.length; i++) {
             let row = rows[i];
             if (!row || row.length === 0) continue;
 
-            // 해당 줄에서 빈 칸을 제외하고 '실제로 데이터가 들어있는 칸의 개수'를 파악
-            let filledCells = row.filter(cell => cell !== undefined && cell !== null && String(cell).trim() !== "");
-            let numFilled = filledCells.length;
+            let rowText = row.join("").replace(/\s/g, "").toUpperCase();
 
-            if (numFilled === 0) continue; // 데이터가 아예 없는 빈 줄은 무시
-
-            // 줄 전체 데이터를 공백 없이 하나의 문장으로 합침
-            let rowText = filledCells.join("").replace(/\s/g, "");
-
-            // 1. 계산에서 제외해야 하는 '제목 헤더'나 '소계' 줄 필터링
-            if (rowText.includes("제품명") || 
-                rowText.includes("규격") || 
-                rowText.includes("소계") || 
-                rowText.includes("타공여부") || 
-                rowText.includes("페이지") || 
-                rowText.includes("단중")) {
+            // 계산 제외 행 (소계, 헤더 등)
+            if (rowText.includes("제품명") || rowText.includes("규격") || 
+                rowText.includes("소계") || rowText.includes("타공여부") || 
+                rowText.includes("페이지") || rowText.includes("단중") || rowText === "") {
                 continue;
             }
 
-            // 2. 구역 이름 인식 ("1. C형강", "2. 각관" 등)
-            // 특징: 자재 상세 스펙이 없으므로 데이터가 채워진 칸이 보통 1~2개뿐임
-            if (numFilled <= 2) {
-                if (rowText.includes("C형강")) {
-                    currentSection = "C형강";
-                } else if (rowText.includes("각관")) {
-                    currentSection = "각관";
-                }
-                continue; // 구역 제목 줄이므로 수량 카운트는 하지 않고 다음 줄로 넘어감
+            // [핵심 기술 적용] 해당 행에 포함된 숫자(치수, 길이, 수량 등)의 개수를 셉니다.
+            // 예: "2.1t" 나 "100" 등은 parseFloat을 만나면 숫자로 인식됩니다.
+            let numberCellCount = row.filter(cell => {
+                let val = String(cell).trim();
+                return val !== "" && !isNaN(parseFloat(val));
+            }).length;
+
+            // 구역 및 제품명 자동 인식
+            if (rowText.includes("POST") || rowText.includes("GIRDER") || rowText.includes("TRUSS")) {
+                currentSection = "각관";
+            } else if (rowText.includes("PURLIN") || rowText.includes("BRACE") || rowText.includes("GIRTH") || rowText.includes("C형강")) {
+                currentSection = "C형강";
+            } else if (rowText.includes("각관")) {
+                currentSection = "각관";
             }
 
-            // 3. 실제 자재/도면 데이터 인식 (칸이 3개 이상 채워져 있음)
-            // 제품명 자체에 "C형강" 또는 "각관" 글자가 있으면 우선 처리
-            if (rowText.includes("C형강")) {
-                countC++;
-                currentSection = "C형강"; 
-            } else if (rowText.includes("각관")) {
-                countPipe++;
-                currentSection = "각관";
-            } else {
-                // 제품명이 "POST-1", "PURLIN-1" 같이 구역 이름이 안 적혀 있으면 현재 지정된 구역을 따름
+            // 영업팀 양식: 행 내에 포스맥이 명시되어 있고 숫자가 3개 이상(규격이 적힘)인 경우
+            if (rowText.includes("포스맥") && numberCellCount >= 3) {
+                if (rowText.includes("C형강")) countC++;
+                else if (rowText.includes("각관")) countPipe++;
+                continue;
+            }
+
+            // 설계팀 양식: 숫자가 3개 이상(치수1, 치수2, 두께, 길이 등) 있는 행은 유효한 도면으로 카운트
+            if (numberCellCount >= 3) {
                 if (currentSection === "C형강") {
                     countC++;
                 } else if (currentSection === "각관") {
                     countPipe++;
+                } else {
+                    // 구역을 못 찾았을 경우 기본값
+                    countPipe++; 
                 }
             }
         }
 
-        // 4. 화면에 수량 업데이트 및 결과창 띄우기
         document.getElementById('cCount').innerText = countC;
         document.getElementById('pipeCount').innerText = countPipe;
         document.getElementById('resultArea').style.display = "block";
-        
-        // 업로드 파일 초기화 (같은 파일을 다시 올렸을 때도 작동하게 함)
         document.getElementById('excelFile').value = ""; 
     }
 
-    function saveData() {
+    // 구글 시트로 데이터를 보내는 함수
+    function sendToGoogleSheet() {
+        let projectName = document.getElementById('projectName').value.trim();
         let pipeCount = document.getElementById('pipeCount').innerText;
-        let pipeAssignee = document.getElementById('pipeAssignee').value;
         let cCount = document.getElementById('cCount').innerText;
-        let cAssignee = document.getElementById('cAssignee').value;
 
-        // 제출 전 유효성 검사
-        if(!pipeAssignee || !cAssignee) {
-            alert("각관과 C형강의 담당자를 모두 선택해주세요!");
-            return;
-        }
-        if(pipeCount === "0" && cCount === "0") {
-            alert("인식된 도면 수량이 없습니다. 올바른 파일인지 확인해주세요.");
+        if(!projectName) {
+            alert("견적서 또는 프로젝트 명을 입력해주세요!");
+            document.getElementById('projectName').focus();
             return;
         }
 
-        // 성공 메시지 (향후 구글 스프레드시트/파이어베이스 연동 시 이 부분을 교체)
-        alert(`🎉 저장 준비 완료!\n\n🟦 각관: ${pipeCount}장 (담당: ${pipeAssignee})\n🟩 C형강: ${cCount}장 (담당: ${cAssignee})`);
+        const dataPayload = {
+            project: projectName,
+            pipe: pipeCount,
+            c_beam: cCount,
+            date: new Date().toLocaleDateString()
+        };
+
+        // =========================================================
+        // ★여기에 구글 스크립트 배포 URL을 붙여넣으세요★
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxt4Nvo4aDUY_jZ3-I9VmUFJRjUCCG7PKK9r9Q4S4eTL7FLrO_HCCFgCcA97STA_LrRpA/exec"; 
+        // =========================================================
+
+        if (GOOGLE_SCRIPT_URL !== "여기에_URL을_붙여넣으세요") {
+            const btn = document.querySelector('.submit-btn');
+            btn.innerText = "데이터 전송 중...";
+            btn.disabled = true;
+
+            // 구글 시트로 POST 요청 전송
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // 구글 시트 전송 시 CORS 회피용
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataPayload)
+            }).then(() => {
+                alert("✅ 구글 시트에 성공적으로 전송되었습니다!");
+                btn.innerText = "구글 시트로 수량 전송";
+                btn.disabled = false;
+                document.getElementById('projectName').value = "";
+                document.getElementById('resultArea').style.display = "none";
+            }).catch(err => {
+                alert("전송 중 오류가 발생했습니다.");
+                btn.innerText = "구글 시트로 수량 전송";
+                btn.disabled = false;
+            });
+        } else {
+            alert(`[전송 시뮬레이션]\n\n프로젝트: ${projectName}\n각관: ${pipeCount}장\nC형강: ${cCount}장\n\n※ 연동하려면 스크립트 코드에 구글 Web App URL을 입력해야 합니다!`);
+        }
     }
 </script>
 
