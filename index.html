@@ -91,7 +91,7 @@
             border-radius: 8px;
             background-color: #fafafa;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            position: relative; /* 삭제 버튼 위치를 위함 */
+            position: relative;
         }
         .file-name-title {
             font-size: 0.95em;
@@ -144,7 +144,7 @@
             margin: 0 5px;
         }
         
-        /* 추가된 하단 버튼 그룹 스타일 */
+        /* 하단 버튼 그룹 스타일 */
         .action-buttons {
             display: flex;
             gap: 10px;
@@ -277,7 +277,7 @@
         if(confirm("추출된 리스트를 모두 초기화하시겠습니까?")) {
             document.getElementById('resultList').innerHTML = '';
             document.getElementById('resultArea').style.display = "none";
-            document.getElementById('excelFile').value = ''; // 파일 선택 정보도 완전 초기화
+            document.getElementById('excelFile').value = ''; // 파일 선택 정보 완전 초기화
             globalFileCounter = 0;
         }
     }
@@ -289,7 +289,7 @@
         let formType = document.querySelector('input[name="formType"]:checked').value;
         let resultList = document.getElementById('resultList');
         
-        // 이전 결과를 초기화하지 않고(누적하기 위해 innerHTML='' 제거)
+        // 이전 결과를 초기화하지 않고 리스트업 영역 보이기
         document.getElementById('resultArea').style.display = "block";
 
         // 선택된 모든 파일을 순회
@@ -454,13 +454,13 @@
         btn.innerText = "일괄 데이터 전송 중...";
         btn.disabled = true;
 
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxt4Nvo4aDUY_jZ3-I9VmUFJRjUCCG7PKK9r9Q4S4eTL7FLrO_HCCFgCcA97STA_LrRpA/exec"; 
+        // ★ 새로 발급받으신 구글 스크립트 주소가 반영되었습니다.
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfwzOZKKAhZH2uW0ZzESEXatXtUvhzqHzVR0BIj5cGCi4EvqVkIMVSKS4cj7bCQWHkgg/exec"; 
 
         let fetchPromises = [];
 
         cards.forEach((card) => {
             let id = card.getAttribute('data-id');
-            // 만약 카드에러 발생 등으로 인풋박스가 없다면 스킵
             let projInput = document.getElementById(`proj_${id}`);
             if(!projInput) return;
 
@@ -470,11 +470,15 @@
 
             if(!projectName) projectName = "업체명 누락 (수정요망)";
 
+            // 날짜, 연도, 월 정보도 함께 넘겨줍니다.
+            let today = new Date();
             const dataPayload = {
                 project: projectName,
                 pipe: pipeCount,
                 c_beam: cCount,
-                date: new Date().toLocaleDateString()
+                date: today.toLocaleDateString(),
+                year: today.getFullYear(),
+                month: today.getMonth() + 1
             };
 
             fetchPromises.push(
@@ -491,10 +495,11 @@
             alert(`✅ 총 ${fetchPromises.length}건의 견적서 수량이 구글 시트에 전송되었습니다!`);
             btn.innerText = "구글 시트로 일괄 전송";
             btn.disabled = false;
-            // 전송 완료 시 리스트 초기화
+            // 전송 완료 시 리스트 자동 초기화
             document.getElementById('resultArea').style.display = "none";
             document.getElementById('resultList').innerHTML = ""; 
-            globalFileCounter = 0; // 고유 ID 초기화
+            document.getElementById('excelFile').value = ''; 
+            globalFileCounter = 0;
         }).catch(err => {
             alert("전송 중 일부 오류가 발생했을 수 있습니다. 구글 시트를 확인해주세요.");
             btn.innerText = "구글 시트로 일괄 전송";
