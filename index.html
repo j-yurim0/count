@@ -274,9 +274,19 @@
                 if (!row) continue;
                 for (let j = 0; j < row.length; j++) {
                     let cellVal = String(row[j] || "");
-                    if (cellVal.includes("견") && cellVal.includes("적") && cellVal.includes("(")) {
+                    if (cellVal.includes("견") && cellVal.includes("적")) {
+                        // 1. 괄호가 있는 경우 괄호 안의 텍스트 추출
                         let match = cellVal.match(/\(([^)]+)\)/);
-                        if (match) site = match[1].trim();
+                        if (match) {
+                            site = match[1].trim();
+                        } 
+                        // 2. 괄호가 없고 하이픈(-)이 있는 경우 그 뒤의 텍스트 추출
+                        else if (cellVal.includes("-")) {
+                            let parts = cellVal.split("-");
+                            if (parts.length > 1) {
+                                site = parts[parts.length - 1].trim();
+                            }
+                        }
                     }
                 }
             }
