@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>도면 수량 자동 산출 및 시트 연동</title>
-    <!-- 엑셀 파일을 읽기 위한 외부 라이브러리 (SheetJS) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { 
@@ -52,7 +51,6 @@
             background-color: #0056b3;
             color: white;
         }
-        /* 드래그 앤 드롭 업로드 영역 스타일 */
         .upload-section { 
             margin-bottom: 20px; 
             padding: 40px 20px; 
@@ -82,8 +80,6 @@
             margin-top: 20px; 
             display: none; 
         }
-        
-        /* 다중 파일 결과 카드 스타일 */
         .file-result-card {
             border: 1px solid #ddd;
             padding: 20px;
@@ -100,6 +96,17 @@
             word-break: break-all;
             padding-right: 25px;
         }
+        .type-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        .type-badge.sales { background-color: #d1e7dd; color: #0f5132; }
+        .type-badge.design { background-color: #cfe2ff; color: #084298; }
+        
         .delete-btn {
             position: absolute;
             top: 15px;
@@ -143,8 +150,6 @@
             font-size: 1.3em;
             margin: 0 5px;
         }
-        
-        /* 하단 버튼 그룹 스타일 */
         .action-buttons {
             display: flex;
             gap: 10px;
@@ -162,9 +167,7 @@
             font-weight: bold;
             transition: background-color 0.2s;
         }
-        button.reset-btn:hover { 
-            background-color: #5a6268; 
-        }
+        button.reset-btn:hover { background-color: #5a6268; }
         button.submit-btn { 
             background-color: #107c41; 
             color: white; 
@@ -177,19 +180,9 @@
             font-weight: bold;
             transition: background-color 0.2s;
         }
-        button.submit-btn:hover { 
-            background-color: #0b5c30; 
-        }
-        button.submit-btn:disabled {
-            background-color: #888;
-            cursor: not-allowed;
-        }
-        .info-text {
-            font-size: 0.9em;
-            color: #666;
-            text-align: center;
-            margin-top: 15px;
-        }
+        button.submit-btn:hover { background-color: #0b5c30; }
+        button.submit-btn:disabled { background-color: #888; cursor: not-allowed; }
+        .info-text { font-size: 0.9em; color: #666; text-align: center; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -205,7 +198,6 @@
         <label for="typeDesign">설계 견적서</label>
     </div>
 
-    <!-- 드래그 앤 드롭 존 -->
     <div class="upload-section" id="dropZone">
         <p style="margin-top: 0; font-weight: bold; color: #555; pointer-events: none;">위에 양식을 선택하고<br><b>여러 개의 엑셀 파일</b>을 이곳으로 드래그 하세요.</p>
         <div class="fake-btn">또는 클릭하여 파일 여러 개 선택</div>
@@ -213,14 +205,10 @@
     </div>
 
     <div id="resultArea" class="result-section">
-        
         <div style="font-weight: bold; margin-bottom: 10px; font-size: 1.1em; display: flex; justify-content: space-between;">
             <span>📊 추출 결과 리스트 (누적 중)</span>
         </div>
-        
-        <!-- 업로드된 파일들의 결과가 이곳에 차곡차곡 리스트업 됩니다. -->
         <div id="resultList"></div>
-
         <div class="action-buttons">
             <button class="reset-btn" onclick="clearList()">목록 초기화</button>
             <button class="submit-btn" onclick="sendToGoogleSheet()">구글 시트로 일괄 전송</button>
@@ -230,7 +218,6 @@
 </div>
 
 <script>
-    // 자재별 규격 정의
     const pipeSpecs = [
         [100, 100, 3.2], [100, 100, 3.0], [100, 100, 2.3], [100, 100, 2.1],
         [100, 50, 2.1], [75, 75, 2.1], [50, 50, 2.1]
@@ -240,7 +227,13 @@
         [100, 50, 3.0], [100, 50, 2.3], [100, 50, 2.1], [75, 45, 2.3], [75, 45, 2.1]
     ];
 
-    let globalFileCounter = 0; // 누적되는 파일마다 고유한 ID를 부여하기 위한 변수
+    let globalFileCounter = 0;
+
+    // ★ 추가: 파일명/프로젝트명에 쌍따옴표가 들어갈 경우 HTML이 깨지는 현상 방지용
+    function escapeHtml(str) {
+        if (!str) return "";
+        return String(str).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
 
     function getNum(val) {
         if (val === undefined || val === null || val === "") return 0;
@@ -252,7 +245,6 @@
         return specsArray.some(spec => spec[0] === v1 && spec[1] === v2 && spec[2] === v3);
     }
 
-    // --- 드래그 앤 드롭 및 클릭 이벤트 처리 ---
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('excelFile');
 
@@ -272,29 +264,27 @@
         if (e.target.files.length > 0) processFiles(e.target.files);
     });
 
-    // 전체 리스트 초기화 함수
     function clearList() {
         if(confirm("추출된 리스트를 모두 초기화하시겠습니까?")) {
             document.getElementById('resultList').innerHTML = '';
             document.getElementById('resultArea').style.display = "none";
-            document.getElementById('excelFile').value = ''; // 파일 선택 정보 완전 초기화
+            document.getElementById('excelFile').value = ''; 
             globalFileCounter = 0;
         }
     }
 
-    // --- 다중 파일 분석 메인 로직 ---
     function processFiles(files) {
         if (files.length === 0) return;
         
         let formType = document.querySelector('input[name="formType"]:checked').value;
-        let resultList = document.getElementById('resultList');
+        let typeStr = formType === 'sales' ? '영업' : '설계';
+        let badgeClass = formType === 'sales' ? 'sales' : 'design';
         
-        // 이전 결과를 초기화하지 않고 리스트업 영역 보이기
+        let resultList = document.getElementById('resultList');
         document.getElementById('resultArea').style.display = "block";
 
-        // 선택된 모든 파일을 순회
         Array.from(files).forEach((f) => {
-            let currentId = globalFileCounter++; // 고유 번호 할당
+            let currentId = globalFileCounter++; 
             let reader = new FileReader();
 
             reader.onload = function(e) {
@@ -305,27 +295,27 @@
                     let projectName = extractProjectName(workbook, formType);
                     let counts = analyzeWorkbook(workbook, formType);
 
-                    // HTML 결과 카드 생성 (삭제 버튼 포함)
+                    // ★ 수정: 변수를 HTML에 넣을 때 escapeHtml 처리
                     let cardHtml = `
-                        <div class="file-result-card" data-id="${currentId}">
+                        <div class="file-result-card" data-id="${currentId}" data-type="${typeStr}">
                             <button class="delete-btn" onclick="this.parentElement.remove()" title="이 항목 삭제">✕</button>
-                            <div class="file-name-title">📁 파일명: ${f.name}</div>
-                            <input type="text" id="proj_${currentId}" class="project-input" value="${projectName}" placeholder="프로젝트명 직접 입력 가능">
+                            <div class="file-name-title">
+                                📁 ${escapeHtml(f.name)} <span class="type-badge ${badgeClass}">${typeStr}</span>
+                            </div>
+                            <input type="text" id="proj_${currentId}" class="project-input" value="${escapeHtml(projectName)}" placeholder="프로젝트명 직접 입력 가능">
                             <div class="counts-wrapper">
                                 <div class="count-item">🟦 각관: <span id="pipe_${currentId}" class="highlight">${counts.totalPipe}</span>장</div>
                                 <div class="count-item">🟩 C형강: <span id="c_${currentId}" class="highlight">${counts.totalC}</span>장</div>
                             </div>
                         </div>
                     `;
-                    // 리스트 끝에 추가
                     resultList.insertAdjacentHTML('beforeend', cardHtml);
-
                 } catch (error) {
                     console.error("파일 처리 오류:", f.name, error);
                     let errorHtml = `
                         <div class="file-result-card" data-id="${currentId}" style="background-color: #fff0f0; border-color: #f5c6c6;">
                             <button class="delete-btn" onclick="this.parentElement.remove()" title="이 항목 삭제">✕</button>
-                            <div class="file-name-title">📁 파일명: ${f.name}</div>
+                            <div class="file-name-title">📁 ${escapeHtml(f.name)}</div>
                             <div style="color: red; font-weight: bold;">❌ 분석 실패 (양식 오류)</div>
                         </div>
                     `;
@@ -334,8 +324,6 @@
             };
             reader.readAsArrayBuffer(f);
         });
-
-        // 업로드 입력창 초기화 (동일 파일 재업로드 지원)
         document.getElementById('excelFile').value = ""; 
     }
 
@@ -379,18 +367,27 @@
         return `${company}(${site})`;
     }
 
-    // 지정된 시트만 스캔하여 도면 수량을 객체 형태로 리턴
     function analyzeWorkbook(workbook, formType) {
         let totalC = 0;
         let totalPipe = 0;
+        let sheetName = "";
 
-        let targetSheetIndex = (formType === 'sales') ? 0 : 1;
-        if (targetSheetIndex >= workbook.SheetNames.length) {
-            targetSheetIndex = workbook.SheetNames.length - 1;
+        if (formType === 'sales') {
+            sheetName = workbook.SheetNames[0]; 
+        } else if (formType === 'design') {
+            let calcSheet = workbook.SheetNames.find(name => name.includes("수량산출서"));
+            if (calcSheet) {
+                sheetName = calcSheet;
+            } else {
+                sheetName = workbook.SheetNames.length > 1 ? workbook.SheetNames[1] : workbook.SheetNames[0];
+            }
         }
 
-        let sheetName = workbook.SheetNames[targetSheetIndex];
         let worksheet = workbook.Sheets[sheetName];
+        
+        // ★ 추가: 찾은 시트가 비어있거나 존재하지 않을 경우 에러 방지
+        if (!worksheet) return { totalC: 0, totalPipe: 0 };
+
         let json_data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
 
         for (let i = 0; i < json_data.length; i++) {
@@ -442,7 +439,6 @@
         return { totalC: totalC, totalPipe: totalPipe };
     }
 
-    // 모든 카드의 데이터를 모아서 시트로 일괄 전송
     function sendToGoogleSheet() {
         const cards = document.querySelectorAll('.file-result-card[data-id]');
         if (cards.length === 0) {
@@ -454,13 +450,13 @@
         btn.innerText = "일괄 데이터 전송 중...";
         btn.disabled = true;
 
-        // ★ 새로 발급받으신 구글 스크립트 주소가 반영되었습니다.
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyu602RD7M2jI4zDXEGlT4hd_Gq70HxU_EZyztwsBR7zfcvhGxjUog-qNh6o6cLrI-idg/exec"; 
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwV2zm5RagoAAGf-gp6mpvM90cbNfXYNZJkNlpj0yZ5ZiE8xAJQGBy31QHomsA4kjV4Cw/exec"; 
 
         let fetchPromises = [];
 
         cards.forEach((card) => {
             let id = card.getAttribute('data-id');
+            let formTypeStr = card.getAttribute('data-type'); 
             let projInput = document.getElementById(`proj_${id}`);
             if(!projInput) return;
 
@@ -470,7 +466,6 @@
 
             if(!projectName) projectName = "업체명 누락 (수정요망)";
 
-            // 날짜, 연도, 월 정보도 함께 넘겨줍니다.
             let today = new Date();
             const dataPayload = {
                 project: projectName,
@@ -478,14 +473,16 @@
                 c_beam: cCount,
                 date: today.toLocaleDateString(),
                 year: today.getFullYear(),
-                month: today.getMonth() + 1
+                month: today.getMonth() + 1,
+                type: formTypeStr 
             };
 
             fetchPromises.push(
                 fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
+                    // ★ 수정: no-cors 통신 시 차단되지 않는 안전한 Content-Type으로 변경
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(dataPayload)
                 })
             );
@@ -495,7 +492,6 @@
             alert(`✅ 총 ${fetchPromises.length}건의 견적서 수량이 구글 시트에 전송되었습니다!`);
             btn.innerText = "구글 시트로 일괄 전송";
             btn.disabled = false;
-            // 전송 완료 시 리스트 자동 초기화
             document.getElementById('resultArea').style.display = "none";
             document.getElementById('resultList').innerHTML = ""; 
             document.getElementById('excelFile').value = ''; 
