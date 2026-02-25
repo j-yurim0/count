@@ -52,13 +52,31 @@
             background-color: #0056b3;
             color: white;
         }
+        /* 드래그 앤 드롭 업로드 영역 스타일 */
         .upload-section { 
             margin-bottom: 20px; 
-            padding: 30px 20px; 
+            padding: 40px 20px; 
             border: 2px dashed #0056b3; 
             background-color: #f8fbff;
             text-align: center; 
             border-radius: 8px; 
+            cursor: pointer;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .upload-section.dragover {
+            background-color: #e2eafc;
+            border-color: #003366;
+        }
+        .fake-btn {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #fff;
+            border: 1px solid #0056b3;
+            color: #0056b3;
+            border-radius: 5px;
+            font-weight: bold;
+            pointer-events: none; 
         }
         .result-section { 
             margin-top: 20px; 
@@ -139,9 +157,11 @@
         <label for="typeDesign">설계 견적서</label>
     </div>
 
-    <div class="upload-section">
-        <p style="margin-top: 0; font-weight: bold; color: #555;">위에 양식을 선택하고 엑셀 파일을 업로드하세요.</p>
-        <input type="file" id="excelFile" accept=".xlsx, .xls" style="margin-top: 10px;" />
+    <!-- 드래그 앤 드롭 존 -->
+    <div class="upload-section" id="dropZone">
+        <p style="margin-top: 0; font-weight: bold; color: #555; pointer-events: none;">위에 양식을 선택하고<br>엑셀 파일을 이곳으로 드래그 하세요.</p>
+        <div class="fake-btn">또는 클릭하여 파일 선택</div>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" style="display: none;" />
     </div>
 
     <div id="resultArea" class="result-section">
@@ -177,27 +197,49 @@
         [100, 50, 3.0], [100, 50, 2.3], [100, 50, 2.1], [75, 45, 2.3], [75, 45, 2.1]
     ];
 
-    // 셀 값에서 순수 숫자만 추출하는 함수 (예: "2.1t" -> 2.1)
+    // 셀 값에서 순수 숫자만 추출 (예: "2.1t" -> 2.1, "POST-1" -> 1)
     function getNum(val) {
         if (val === undefined || val === null) return 0;
         let n = parseFloat(String(val).replace(/[^0-9.]/g, ''));
         return isNaN(n) ? 0 : n;
     }
 
-    // 규격이 일치하는지 확인하는 함수
-    function isMatch(v1, v2, v3, specsArray) {
-        return specsArray.some(spec => spec[0] === v1 && spec[1] === v2 && spec[2] === v3);
+    // 행(Row) 안에 해당 규격 숫자들이 '모두' 포함되어 있는지 검사하는 스마트 함수
+    function rowContainsSpec(rowNums, spec) {
+        let temp = [...rowNums];
+        for (let s of spec) {
+            let idx = temp.indexOf(s);
+            if (idx === -1) return false; // 규격 숫자 중 하나라도 없으면 탈락
+            temp.splice(idx, 1); // 찾은 숫자는 임시 배열에서 제거 (중복 검사를 위함)
+        }
+        return true;
     }
 
-    document.getElementById('excelFile').addEventListener('change', handleFile, false);
+    // --- 드래그 앤 드롭 및 클릭 이벤트 처리 ---
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('excelFile');
 
-    function handleFile(e) {
-        let files = e.target.files;
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            fileInput.files = e.dataTransfer.files; 
+            processFiles(e.dataTransfer.files);     
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) processFiles(e.target.files);
+    });
+
+    // --- 파일 분석 메인 로직 ---
+    function processFiles(files) {
         if (files.length === 0) return;
         let f = files[0];
         let reader = new FileReader();
-
-        // 선택된 양식 타입 (영업 또는 설계)
         let formType = document.querySelector('input[name="formType"]:checked').value;
 
         reader.onload = function(e) {
@@ -209,12 +251,8 @@
                 let projectName = extractProjectName(workbook, formType);
                 document.getElementById('projectName').value = projectName;
 
-                // 2. 수량 산출 (첫 번째 시트 기준)
-                let firstSheetName = workbook.SheetNames[0];
-                let worksheet = workbook.Sheets[firstSheetName];
-                let json_data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-                
-                analyzeData(json_data, formType);
+                // 2. 전체 시트 순회하며 수량 산출
+                analyzeWorkbook(workbook, formType);
             } catch (error) {
                 alert("파일 분석 중 오류가 발생했습니다. 양식이 맞는지 확인해주세요.");
                 console.error(error);
@@ -223,17 +261,14 @@
         reader.readAsArrayBuffer(f);
     }
 
-    // 업체명 및 현장명 자동 추출 함수
     function extractProjectName(workbook, formType) {
         let company = "업체명미상";
         let site = "현장명미상";
 
         if (formType === 'sales') {
-            // [영업 견적서] 추출 로직
             let sheet = workbook.Sheets[workbook.SheetNames[0]];
             let data = XLSX.utils.sheet_to_json(sheet, {header: 1});
             
-            // 현장명 추출: B7 근처에서 '(현장명)' 형태 찾기
             for (let i = 0; i < Math.min(20, data.length); i++) {
                 let row = data[i];
                 if (!row) continue;
@@ -245,17 +280,13 @@
                     }
                 }
             }
-            // 업체명 추출: C10 셀 (배열 인덱스는 row 9, col 2)
             if (data[9] && data[9][2]) company = String(data[9][2]).replace(/주식회사/g, '').trim();
 
         } else if (formType === 'design') {
-            // [설계 견적서] 추출 로직
             let estimateSheet = workbook.Sheets["견적서"];
             if (estimateSheet) {
                 let estData = XLSX.utils.sheet_to_json(estimateSheet, {header: 1});
-                // 업체명 추출: C11 (row 10, col 2)
                 if (estData[10] && estData[10][2]) company = String(estData[10][2]).replace(/주식회사/g, '').trim();
-                // 현장명 추출: Z1 (row 0, col 25)
                 if (estData[0] && estData[0][25]) site = String(estData[0][25]).trim();
             } else {
                 company = "견적서시트없음";
@@ -265,47 +296,76 @@
         return `${company}(${site})`;
     }
 
-    // 수량 파악 (엑셀 수식 원리 적용)
-    function analyzeData(rows, formType) {
-        let countC = 0;
-        let countPipe = 0;
+    // 전 시트를 스캔하여 도면 수량 파악
+    function analyzeWorkbook(workbook, formType) {
+        let totalC = 0;
+        let totalPipe = 0;
 
-        for (let i = 0; i < rows.length; i++) {
-            let row = rows[i];
-            if (!row || row.length === 0) continue;
+        for (let sheetName of workbook.SheetNames) {
+            // 설계 견적서일 경우 '견적서' 표지 시트는 카운트에서 제외 (오작동 방지)
+            if (formType === 'design' && sheetName.includes("견적서")) continue;
 
-            let dim1 = 0, dim2 = 0, thickPipe = 0, thickC = 0;
+            let worksheet = workbook.Sheets[sheetName];
+            let json_data = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+            
+            let currentSection = "각관"; 
 
-            if (formType === 'sales') {
-                // 영업 열 위치: 장변(C:2), 단변(D:3), 각관두께(E:4), C형강두께(F:5)
-                dim1 = getNum(row[2]);
-                dim2 = getNum(row[3]);
-                thickPipe = getNum(row[4]); 
-                thickC = getNum(row[5]);
+            for (let i = 0; i < json_data.length; i++) {
+                let row = json_data[i];
+                if (!row || row.length === 0) continue;
 
-            } else if (formType === 'design') {
-                // 설계 열 위치: 장변(E:4), 단변(F:5), 각관두께(G:6), C형강두께(H:7)
-                dim1 = getNum(row[4]);
-                dim2 = getNum(row[5]);
-                thickPipe = getNum(row[6]);
-                thickC = getNum(row[7]);
-            }
+                let rowText = row.map(cell => String(cell || "").replace(/\s/g, "").toUpperCase()).join("");
 
-            // 규격 매칭 검사
-            if (isMatch(dim1, dim2, thickPipe, pipeSpecs)) {
-                countPipe++;
-            } else if (isMatch(dim1, dim2, thickC, cSpecs)) {
-                countC++;
+                // 요약 테이블, 헤더 등 수량에 포함되면 안 되는 줄 스킵
+                if (rowText.includes("소계") || rowText.includes("합계") || 
+                    rowText.includes("단중") || rowText.includes("중량") || 
+                    rowText.includes("페이지") || rowText.includes("제품명") || 
+                    rowText.includes("규격") || rowText === "") {
+                    continue;
+                }
+
+                // 구역명(Section) 갱신
+                if (rowText.includes("POST") || rowText.includes("GIRDER") || rowText.includes("TRUSS") || rowText.includes("각관")) {
+                    currentSection = "각관";
+                }
+                if (rowText.includes("PURLIN") || rowText.includes("BRACE") || rowText.includes("GIRTH") || rowText.includes("C형강")) {
+                    currentSection = "C형강";
+                }
+
+                // 해당 줄(Row)의 모든 숫자만 추출
+                let rowNums = row.map(cell => getNum(cell)).filter(n => n > 0);
+
+                if (formType === 'sales') {
+                    if (rowText.includes("포스맥") && rowNums.length >= 3) {
+                        if (rowText.includes("C형강")) { totalC++; continue; }
+                        if (rowText.includes("각관")) { totalPipe++; continue; }
+                    }
+                }
+
+                // 일반 자재 데이터 (한 줄에 숫자가 3~10개 정도 존재하는 경우만 도면으로 취급)
+                if (rowNums.length >= 3 && rowNums.length <= 10) { 
+                    let isPipe = pipeSpecs.some(spec => rowContainsSpec(rowNums, spec));
+                    let isC = cSpecs.some(spec => rowContainsSpec(rowNums, spec));
+
+                    if (isPipe && isC) {
+                        // 규격이 겹칠 경우 현재 속한 구역명(Section)을 따름
+                        if (currentSection === "C형강") totalC++;
+                        else totalPipe++;
+                    } else if (isPipe) {
+                        totalPipe++;
+                    } else if (isC) {
+                        totalC++;
+                    }
+                }
             }
         }
 
-        document.getElementById('cCount').innerText = countC;
-        document.getElementById('pipeCount').innerText = countPipe;
+        document.getElementById('cCount').innerText = totalC;
+        document.getElementById('pipeCount').innerText = totalPipe;
         document.getElementById('resultArea').style.display = "block";
         document.getElementById('excelFile').value = ""; 
     }
 
-    // 구글 시트로 데이터를 보내는 함수
     function sendToGoogleSheet() {
         let projectName = document.getElementById('projectName').value.trim();
         let pipeCount = document.getElementById('pipeCount').innerText;
@@ -324,7 +384,6 @@
             date: new Date().toLocaleDateString()
         };
 
-        // ★ 발급받은 구글 스크립트 주소 ★
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxt4Nvo4aDUY_jZ3-I9VmUFJRjUCCG7PKK9r9Q4S4eTL7FLrO_HCCFgCcA97STA_LrRpA/exec"; 
 
         const btn = document.querySelector('.submit-btn');
