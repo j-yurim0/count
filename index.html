@@ -144,17 +144,37 @@
             margin: 0 5px;
         }
         
+        /* 추가된 하단 버튼 그룹 스타일 */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        button.reset-btn { 
+            background-color: #6c757d; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            width: 30%; 
+            padding: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        button.reset-btn:hover { 
+            background-color: #5a6268; 
+        }
         button.submit-btn { 
             background-color: #107c41; 
             color: white; 
             border: none; 
             border-radius: 6px; 
             cursor: pointer; 
-            width: 100%; 
+            width: 70%; 
             padding: 15px;
             font-size: 1.1em;
             font-weight: bold;
-            margin-top: 10px;
             transition: background-color 0.2s;
         }
         button.submit-btn:hover { 
@@ -196,13 +216,15 @@
         
         <div style="font-weight: bold; margin-bottom: 10px; font-size: 1.1em; display: flex; justify-content: space-between;">
             <span>📊 추출 결과 리스트 (누적 중)</span>
-            <span style="font-size: 0.8em; color: #666; font-weight: normal; cursor: pointer;" onclick="clearList()">전체 비우기 🔄</span>
         </div>
         
         <!-- 업로드된 파일들의 결과가 이곳에 차곡차곡 리스트업 됩니다. -->
         <div id="resultList"></div>
 
-        <button class="submit-btn" onclick="sendToGoogleSheet()">구글 시트로 일괄 전송</button>
+        <div class="action-buttons">
+            <button class="reset-btn" onclick="clearList()">목록 초기화</button>
+            <button class="submit-btn" onclick="sendToGoogleSheet()">구글 시트로 일괄 전송</button>
+        </div>
         <p class="info-text">※ 위 리스트의 모든 데이터가 구글 시트에 순차적으로 기록됩니다.</p>
     </div>
 </div>
@@ -252,9 +274,10 @@
 
     // 전체 리스트 초기화 함수
     function clearList() {
-        if(confirm("추출된 리스트를 모두 지우시겠습니까?")) {
+        if(confirm("추출된 리스트를 모두 초기화하시겠습니까?")) {
             document.getElementById('resultList').innerHTML = '';
             document.getElementById('resultArea').style.display = "none";
+            document.getElementById('excelFile').value = ''; // 파일 선택 정보도 완전 초기화
             globalFileCounter = 0;
         }
     }
