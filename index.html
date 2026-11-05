@@ -219,15 +219,15 @@ root.CompareCore={num,quote,packing,aggregate,compare,classify};
         .info-text { font-size: 0.9em; color: #666; text-align: center; margin-top: 15px; }
     
 .container{max-width:1000px}table{border-collapse:collapse;width:100%;margin:14px 0}td,th{border:1px solid #cbd5e1;padding:9px;text-align:right}th{background:#edf5f1}td:first-child,th:first-child{text-align:left}.scroll{overflow:auto}.status{white-space:pre-wrap;line-height:1.6;margin:12px 0}.warning{color:#a33b12}.settings{margin:18px 0}input[type=url]{box-sizing:border-box;width:100%;padding:9px}.project-input{margin-top:10px}.summary{background:#eaf5ef;padding:12px;border-radius:6px}.delete-btn{border:0}.count-item{font-size:1em}.action-buttons button{font-size:1em}.help{line-height:1.7;color:#536272}button:disabled{opacity:.5;cursor:wait}details{margin:12px 0}li{margin:5px 0}
-</style></head><body><main class="container"><h2>도면 수량 · C형강 상세 등록 <small>v3</small></h2>
+</style></head><body><main class="container"><h2>도면 수량 · C형강 상세 등록 <small>v3.1</small></h2>
 <p class="help">각관·C형강 도면 장수는 기존대로 집계하고, C형강의 규격별 상세 항목을 추가합니다. 같은 타공 구분·규격을 한 행으로 합산하여 <b>J열 규격 · K열 중량(kg) · L열 수량</b>에 등록합니다.</p>
 <details class="settings"><summary>구글 시트 연결 설정</summary><p class="help">함께 제공된 앱스크립트로 기존 도면 수량 앱의 배포를 업데이트하세요. 새 배포를 만들었다면 아래 URL을 바꿔 주세요.</p><input id="endpoint" type="url" aria-label="Apps Script 웹 앱 URL"><p class="help">이 브라우저에 URL을 기억합니다.</p></details>
 <div class="form-type-selector"><input type="radio" id="typeSales" name="formType" value="sales" checked><label for="typeSales">영업 견적서</label><input type="radio" id="typeDesign" name="formType" value="design"><label for="typeDesign">설계 산출서</label></div>
 <div class="upload-section" id="dropZone" tabindex="0" role="button" aria-label="견적 엑셀 선택"><b>견적서 / 산출서 엑셀을 끌어놓거나 클릭해 주세요</b><p>XLSX / XLS / XLSM / XLSB · 여러 파일 가능</p><input id="excelFile" type="file" accept=".xlsx,.xls,.xlsm,.xlsb" multiple hidden></div>
 <div id="summary" class="summary">견적 파일을 추가해 주세요.</div><div id="status" class="status" role="status" aria-live="polite"></div><div id="resultList"></div>
 <div class="action-buttons"><button class="reset-btn" id="reset">목록 초기화</button><button class="submit-btn" id="submit">구글 시트로 일괄 전송</button></div>
-<p class="help">도면 장수와 제품 수량은 다릅니다. 도면 장수는 기존 앱의 행 판별 기준을 유지하고, 제품 수량·중량은 비교 앱의 기준으로 집계합니다. 새로고침하면 목록은 초기화됩니다.</p>
-<details><summary>집계 및 등록 기준</summary><ul class="help"><li>도면 장수는 각관·C형강 모두 유지합니다. 규격·중량·제품 수량 상세 집계는 기존 9개 C형강 규격에만 적용합니다.</li><li>영업 견적서는 첫 시트, 설계 산출서는 이름에 ‘수량산출서’ 또는 ‘산출서’가 있는 첫 시트를 읽습니다.</li><li>견적의 J열 수량·K열 중량을 읽습니다. 영업 양식 O열, 설계 양식 C열에 ‘무타공’이 있으면 별도로 합산합니다.</li><li>수식은 재계산하지 않습니다. 수량·중량이 비어 있거나 숫자가 아닌 행이 있으면 전송을 막고 출처를 표시합니다.</li><li>각관 도면 장수는 C열, C형강 도면 장수는 D열, 양식은 H열에 등록합니다. I열은 사용하지 않습니다.</li><li>타공·무타공 및 규격별로 J~L행을 나누고, A~H의 공통 정보는 현장 단위로 병합합니다.</li><li>연결된 앱스크립트의 버전을 확인한 뒤 전송하고, 서버가 기록 결과를 확인한 경우에만 등록 완료로 표시합니다. 자동으로 목록을 지우지 않습니다.</li></ul></details>
+<p class="help">도면 장수와 제품 수량은 다릅니다. 도면 장수는 기존 앱의 행 판별 기준을 유지하고, 제품 수량·중량은 비교 앱의 기준으로 집계합니다. 전송 완료된 파일은 목록에서 자동으로 삭제되며, 다음 파일을 바로 추가할 수 있습니다. 새로고침하면 목록은 초기화됩니다.</p>
+<details><summary>집계 및 등록 기준</summary><ul class="help"><li>도면 장수는 각관·C형강 모두 유지합니다. 규격·중량·제품 수량 상세 집계는 기존 9개 C형강 규격에만 적용합니다.</li><li>영업 견적서는 첫 시트, 설계 산출서는 이름에 ‘수량산출서’ 또는 ‘산출서’가 있는 첫 시트를 읽습니다.</li><li>견적의 J열 수량·K열 중량을 읽습니다. 영업 양식 O열, 설계 양식 C열에 ‘무타공’이 있으면 별도로 합산합니다.</li><li>수식은 재계산하지 않습니다. 수량·중량이 비어 있거나 숫자가 아닌 행이 있으면 전송을 막고 출처를 표시합니다.</li><li>각관 도면 장수는 C열, C형강 도면 장수는 D열, 양식은 H열에 등록합니다. I열은 사용하지 않습니다.</li><li>타공·무타공 및 규격별로 J~L행을 나누고, A~H의 공통 정보는 현장 단위로 병합합니다.</li><li>연결된 앱스크립트의 버전을 확인한 뒤 전송하고, 서버가 기록 결과를 확인하면 완료 알림을 표시하고, 등록 완료된 파일은 목록에서 자동으로 삭제합니다. 실패하거나 결과가 확인되지 않은 파일은 목록에 남깁니다.</li></ul></details>
 </main><script>
 'use strict';
 const pipeSpecs=[[100,100,3.2],[100,100,3],[100,100,2.3],[100,100,2.1],[100,50,2.1],[75,75,2.1],[50,50,2.1]];
@@ -352,12 +352,12 @@ function isMatch(a,b,c,s){return s.some(x=>x[0]===a&&x[1]===b&&x[2]===c);}
 const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>Number(v).toLocaleString('ko-KR',{maximumFractionDigits:3});
 let files=[],busy=false,uid=0;
-const defaultURL='https://script.google.com/macros/s/AKfycbwV2zm5RagoAAGf-gp6mpvM90cbNfXYNZJkNlpj0yZ5ZiE8xAJQGBy31QHomsA4kjV4Cw/exec';
-try{$('endpoint').value=localStorage.getItem('cbeamRegistrationURL')||defaultURL;}catch(e){$('endpoint').value=defaultURL;}
-$('endpoint').onchange=()=>{try{localStorage.setItem('cbeamRegistrationURL',$('endpoint').value.trim());}catch(e){}};
+const defaultURL='https://script.google.com/macros/s/AKfycby7X1fD0SIZhnV5oaVgNc4vJM4NyH4EYern0wSevlxhxT8W8HR5mYS95Ef0HjfAcmdrlg/exec';
+try{$('endpoint').value=localStorage.getItem('cbeamRegistrationURL_v3_1')||defaultURL;}catch(e){$('endpoint').value=defaultURL;}
+$('endpoint').onchange=()=>{try{localStorage.setItem('cbeamRegistrationURL_v3_1',$('endpoint').value.trim());}catch(e){}};
 function render(){
  $('resultList').innerHTML=files.map(f=>`<section class="file-result-card"><button class="delete-btn" data-remove="${f.id}" ${busy?'disabled':''} aria-label="파일 삭제">×</button><div class="file-name-title">${esc(f.name)} · ${f.type==='sales'?'영업':'설계'}</div><input class="project-input" data-project="${f.id}" value="${esc(f.project)}" aria-label="업체명 및 현장명" ${busy?'disabled':''}><div class="counts-wrapper"><div class="count-item">각관 도면 <b>${f.pipeDrawings}</b>장</div><div class="count-item">C형강 도면 <b>${f.drawings}</b>장</div><div class="count-item">제품 수량 <b>${fmt(f.items.reduce((s,x)=>s+x.qty,0))}</b></div><div class="count-item">중량 <b>${fmt(f.items.reduce((s,x)=>s+x.weight,0))}</b>kg</div></div><div class="scroll"><table><thead><tr><th>J열 · 규격</th><th>K열 · 중량(kg)</th><th>L열 · 수량</th></tr></thead><tbody>${f.items.map(x=>`<tr><td>${x.mode==='무타공'?'무타공 ':''}${esc(x.spec)}</td><td>${fmt(x.weight)}</td><td>${fmt(x.qty)}</td></tr>`).join('')||'<tr><td colspan="3">추출된 C형강이 없습니다.</td></tr>'}</tbody></table></div>${f.warnings.length?`<div class="warning"><b>전송 전 확인 필요</b><ul>${f.warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul></div>`:''}<div class="status">${esc(f.message||'전송 대기')}</div>${f.sent?`<button data-retry="${f.id}" ${busy?'disabled':''}>등록 미확인 시 재전송 준비</button>`:''}<details><summary>집계 근거</summary><ul>${f.items.flatMap(x=>x.sources.map(s=>`<li>${esc(x.mode+' '+x.spec+' · '+s.source)} · 수량 ${esc(s.qty)} · 중량 ${esc(s.weight)}kg</li>`)).join('')}</ul></details></section>`).join('');
- $('summary').textContent=`${files.length}개 파일 · ${files.reduce((s,f)=>s+f.items.length,0)}개 구분·규격 · C형강 중량 ${fmt(files.reduce((s,f)=>s+f.items.reduce((a,x)=>a+x.weight,0),0))}kg`;
+ $('summary').textContent=files.length?`${files.length}개 파일 · ${files.reduce((s,f)=>s+f.items.length,0)}개 구분·규격 · C형강 중량 ${fmt(files.reduce((s,f)=>s+f.items.reduce((a,x)=>a+x.weight,0),0))}kg`:'견적 파일을 추가해 주세요.';
  $('submit').disabled=busy||!files.some(f=>!f.sent);$('reset').disabled=busy;$('excelFile').disabled=busy;$('endpoint').disabled=busy;document.querySelectorAll('[name=formType]').forEach(e=>e.disabled=busy);
 }
 async function upload(list){if(busy)return;busy=true;render();const type=document.querySelector('[name=formType]:checked').value;const errors=[];
@@ -381,8 +381,11 @@ function getServerStatus(url,requestId){return new Promise((resolve,reject)=>{
  timer=setTimeout(()=>{cleanup();reject(Error('응답이 없습니다. 제공된 v3 Apps Script로 기존 배포를 업데이트했는지 확인해 주세요.'));},15000);document.head.appendChild(script);
 });}
 $('submit').onclick=async()=>{
+ if(busy)return;
  const todo=files.filter(f=>!f.sent),url=$('endpoint').value.trim();if(!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url))return alert('Apps Script 웹 앱의 /exec URL을 확인해 주세요.');
+ if(!todo.length)return;
  const invalid=todo.filter(f=>!f.project.trim()||(!f.items.length&&(!f.pipeDrawings||f.drawings))||f.warnings.length||f.items.some(x=>x.invalid||x.qty<0||x.weight<0));if(invalid.length)return alert('추출 오류·빈 현장명·음수 값이 있는 파일을 확인하거나 목록에서 제외해 주세요.\n'+invalid.map(f=>f.name).join('\n'));
+ let completed=0,notice='';
  busy=true;$('status').textContent='연결된 앱스크립트 버전을 확인하고 있습니다.';render();
  try{
  const server=await getServerStatus(url,'probe');if(server.apiVersion!=='cbeam-v3')throw Error('연결된 Apps Script 버전이 다릅니다. 제공된 v3 코드로 배포를 업데이트해 주세요.');
@@ -393,12 +396,17 @@ $('submit').onclick=async()=>{
  for(let i=0;i<15;i++){receipt=await getServerStatus(url,f.requestId);if(receipt.result==='success'||receipt.result==='error')break;await new Promise(r=>setTimeout(r,1000));}
  if(receipt.result==='error')throw Error(receipt.message||'시트 등록 중 오류가 발생했습니다.');
  if(receipt.result!=='success')throw Error('등록 결과가 아직 확인되지 않았습니다. 시트를 확인하고 필요하면 다시 전송해 주세요.');
+ completed++;
+ files=files.filter(item=>item.id!==f.id);
  f.sent=true;f.message='등록 완료 — '+receipt.sheet+' / '+receipt.startRow+'행부터 '+receipt.rows+'행'+(receipt.duplicate?' (기존 등록 확인)':'');
  }catch(e){f.message='등록 미확인: '+e.message;}
  render();}
- $('status').textContent='등록 결과를 파일별로 확인해 주세요. 등록 완료 항목은 재전송하지 않습니다.';
- }catch(e){$('status').textContent=e.message;}
- finally{busy=false;render();}
+ const remaining=todo.length-completed;
+ notice=remaining?`전송 결과: ${completed}개 완료, ${remaining}개 미완료.\n완료된 파일은 목록에서 자동으로 삭제했습니다.\n남은 파일의 등록 결과를 확인해 주세요.`:`구글 스프레드시트에 ${completed}개 파일 등록이 완료되었습니다.\n전송된 목록을 자동으로 초기화했습니다. 다음 파일을 추가해 주세요.`;
+ $('status').textContent=notice;
+ }catch(e){notice='전송을 완료하지 못했습니다.\n'+e.message;$('status').textContent=notice;}
+ finally{busy=false;$('excelFile').value='';render();}
+ if(notice)alert(notice);
 };
 render();
 </script></body></html>
